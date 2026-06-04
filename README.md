@@ -83,6 +83,6 @@ A **design document**. No fixed length: clarity beats volume, a few clear pages 
 
 Optionally, include a **small prototype** in any language, run against the provided data, that demonstrates one idea you think matters. Keep it tiny: a short script that illustrates a single idea, for example how the value you put on offcuts changes which layout you pick, is exactly right. Do not build a production packer. We care about your reasoning far more than runnable code or polish, so skip the prototype if you are short on time.
 
-### Logistics
+### Timing
 
 You have a couple of days of calendar time so you can fit this around your schedule. We do not expect more than a few hours of real work, and we will not reward volume over judgment. Go deeper only if you genuinely enjoy it; we do not score length, and we will not think less of a submission that stops at the few-hours mark. A tight, clear submission is exactly what we are hoping for.
