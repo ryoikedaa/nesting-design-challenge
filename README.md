@@ -73,7 +73,7 @@ The gap between those two, and how you reason about it, tells us as much as eith
 
 ### What to hand back
 
-A **design document**. No fixed length: clarity beats volume, a few clear pages is plenty, and a diagram where it helps is welcome but never required. We would like it to cover:
+A **design document**. No fixed length: clarity beats volume, a few clear pages works, and a diagram where it helps is welcome but never required. We would like it to cover:
 
 - **The objective.** In concrete terms, what makes one layout better than another? How do you handle the uncertainty in the value of offcuts?
 - **Assumptions and questions.** What you assumed, and anything you asked us and how you resolved it.
