@@ -6,7 +6,7 @@
 ## Data Summary and Insights
 An analysis of the provided datasets clarifies the specific operational constraints of the shop:
 * **jobs.json:** Represents 10 active orders totaling 22 distinct parts. The materials range from standard, highly utilized 6061-T6 Aluminum to premium, higher-strength 7075-T6, with thicknesses spanning from 0.125 inches to 1 inch.
-* **inventory.json:** Features 10 infinite fresh plate SKU supply channels alongside a finite inventory of 26 unique drops. The remnant bin is heavily populated by 6061-T6. Notably, very small pieces like drop-0016 (6x8) and drop-0026 (5x9) are borderline scrap.
+* **inventory.json:** Features 10 infinite fresh plate SKU supply channels alongside a finite inventory of 26 unique drops. The remnant bin is heavily populated by 6061-T6. Notably, very small pieces like drop-0016 ($6 \times 8$) and drop-0026 ($5 \times 9$) are borderline scrap.
 * **order_history.json:** Contains a year of historical order records. The demand history is overwhelmingly concentrated in 6061-T6 stock, with typical part dimensions clustering tightly between 5 and 30 inches.
 
 ---
@@ -39,7 +39,7 @@ The prototype implements a predictable Greedy Heuristic combined with an area-co
 
 1. **Pre-Processing:** Parts are extracted from active jobs and sorted by raw bounding-box area in descending order, ensuring large parts are nested first.
 2. **Remnant Matching:** The algorithm traverses the active drop bin to look for an alloy-matched, thickness-compatible piece that fits the part.
-   * **Physical Safety Filter:** Remnants are strictly bypassed if their short-side dimension drops below a hard 4.0-inch threshold. This prevents operators from attempting to clamp dangerously small, unstable scrap pieces onto the saw bed.
+   * **Physical Safety Filter:** Remnants are strictly bypassed if their short-side dimension drops below a hard 6.0-inch threshold. This prevents operators from attempting to clamp dangerously small, unstable scrap pieces onto the saw bed.
 3. **Fresh Stock Consolidation:** If no valid drop accommodates the part, the system checks active, open fresh plate runs of the same alloy and thickness. It evaluates kerf width (0.1 inches) and remaining area to pack multiple parts onto the same stock sheet, sharing the flat $25.00 setup penalty across several items.
 
 ---
@@ -49,13 +49,13 @@ The greedy prototype was benchmarked directly against a naive factory baseline, 
 
 | Optimization Metric | Naive Baseline | Optimized Strategy | Net Improvement |
 | :--- | :---: | :---: | :---: |
-| **Parts Allocated from Drops** | 0 | 11 | +11 Items Saved |
+| **Parts Allocated from Drops** | 0 | 10 | +10 Items Saved |
 | **Unique Fresh Stock Sheets Loaded** | 22 | 7 | -15 Setup Cycles |
 | **Total Batch Setup Cost** | $550.00 | $175.00 | $375.00 Saved |
 | **Operational Overhead Reduction** | 0% | 68.1% | 68.1% Efficiency Gain |
 
 ### Key Observations:
-By explicitly enforcing the 4-inch minimum clamping threshold, the system flags tiny remnants like drop-0026 (5x9) as unkeepable scrap, prioritizing shop floor safety. The 68% setup cost reduction proves that batching multiple items onto shared plates fundamentally shifts production profitability.
+By explicitly enforcing the 6-inch minimum clamping threshold, the system flags tiny remnants like drop-0026 ($5 \times 9$) as unkeepable scrap, prioritizing shop floor safety. The 68% setup cost reduction proves that batching multiple items onto shared plates fundamentally shifts production profitability.
 
 ---
 
