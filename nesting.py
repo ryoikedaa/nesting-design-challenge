@@ -2,94 +2,108 @@ import json
 
 with open('data/jobs.json') as f:
     jobs = json.load(f)
-
 with open('data/inventory.json') as f:
     inventory = json.load(f)
-
 with open('data/order_history.json') as f:
     history = json.load(f)
 
-print(f"Jobs: {len(jobs)}")
-print(f"Inventory: {len(inventory)}")
-print(f"History: {len(history)}")
-
-
-
+# Shop Constraints
+MACHINE_RATE = 75.0 / 60.0  # $1.25 per minute
+SETUP_TIME = 20.0          # minutes ($25.00 flat setup cost)
+KERF = 0.1                 # 1/10th inch saw blade width
+MIN_DROP_SHORT_SIDE = 4.0  # Hard machine/convention boundary
 
 drops = [item for item in inventory if item['kind'] == 'drop']
 plates = [item for item in inventory if item['kind'] == 'plate']
 
-print(f"Drops: {len(drops)}")
-print(f"Fresh plates: {len(plates)}")
-
-# Flatten all parts from all jobs into one list
+# Flatten and sort parts by area descending
 parts = []
 for job in jobs:
     for part in job['parts']:
         part['order_id'] = job['order_id']
         parts.append(part)
-
-# Sort biggest to smallest by area
 parts.sort(key=lambda p: p['width_in'] * p['length_in'], reverse=True)
 
-print(f"\nTotal parts to cut: {len(parts)}")
-print(f"Biggest part: {parts[0]['width_in']}x{parts[0]['length_in']} {parts[0]['alloy']}")
-print(f"Smallest part: {parts[-1]['width_in']}x{parts[-1]['length_in']} {parts[-1]['alloy']}")
+def fits(p_w, p_l, s_w, s_l):
+    """Checks if a part fits inside stock dimensions (including 90 deg rotation)"""
+    return (p_w <= s_w and p_l <= s_l) or (p_l <= s_w and p_w <= s_l)
 
-def fits(part, stock):
-    w, l = part['width_in'], part['length_in']
-    sw, sl = stock['width_in'], stock['length_in']
-    # fits normally or rotated 90 degrees
-    return (w <= sw and l <= sl) or (l <= sw and w <= sl)
-
-# For each part, find matching drops
-print("\nDrop matching:")
-for part in parts:
-    matching = [d for d in drops if 
-                d['alloy'] == part['alloy'] and 
-                abs(d['thickness_in'] - part['thickness_in']) < 0.01 and
-                fits(part, d)]
-    print(f"  {part['width_in']}x{part['length_in']} {part['alloy']} {part['thickness_in']
-    }\" → {len(matching)} drops fit")
-
-#Greedy algorithm to find the best layout
-
-print("\nGreedy assignment:")
 used_drops = set()
 assignments = []
+fresh_plate_runs = [] # Tracks multi-part packing on fresh plates
 
 for part in parts:
-    # find matching drops not already used
-    matching = [d for d in drops if 
-                d['id'] not in used_drops and
-                d['alloy'] == part['alloy'] and 
-                abs(d['thickness_in'] - part['thickness_in']) < 0.01 and
-                fits(part, d)]
+    p_w, p_l = part['width_in'], part['length_in']
     
-    if matching:
-        # pick the tightest fitting drop (least waste)
-        best = min(matching, key=lambda d: d['width_in'] * d['length_in'])
-        used_drops.add(best['id'])
-        assignments.append((part, best, 'drop'))
-        print(f"  {part['width_in']}x{part['length_in']} {part['alloy']} → DROP {best['id']} ({best['width_in']}x{best['length_in']})")
+    # 1. TRY TO ASSIGN TO AN EXISTING VALID DROP
+    matching_drops = [
+        d for d in drops 
+        if d['id'] not in used_drops 
+        and d['alloy'] == part['alloy'] 
+        and abs(d['thickness_in'] - part['thickness_in']) < 0.01 
+        and fits(p_w, p_l, d['width_in'], d['length_in'])
+        and min(d['width_in'], d['length_in']) >= MIN_DROP_SHORT_SIDE # Enforce drop safety
+    ]
+    
+    if matching_drops:
+        best_drop = min(matching_drops, key=lambda d: d['width_in'] * d['length_in'])
+        used_drops.add(best_drop['id'])
+        assignments.append({'part': part, 'stock_id': best_drop['id'], 'type': 'drop'})
+        continue
+
+    # 2. TRY TO PACK MULTIPLE PARTS ONTO AN ALREADY OPENED FRESH PLATE BIN
+    packed_successfully = False
+    for run in fresh_plate_runs:
+        if run['alloy'] == part['alloy'] and abs(run['thickness'] - part['thickness_in']) < 0.01:
+            # Simple area-based remaining tracker heuristic (accounting for Kerf)
+            used_area = run['used_area']
+            total_area = run['plate_spec']['width_in'] * run['plate_spec']['length_in']
+            part_area = (p_w + KERF) * (p_l + KERF)
+            
+            if total_area - used_area >= part_area and fits(p_w, p_l, run['plate_spec']['width_in'], run['plate_spec']['length_in']):
+                run['used_area'] += part_area
+                run['parts'].append(part)
+                assignments.append({'part': part, 'stock_id': f"Fresh-Plate-Run-{run['id']}", 'type': 'packed_fresh'})
+                packed_successfully = True
+                break
+                
+    if packed_successfully:
+        continue
+
+    # 3. IF NO DROPS OR EXISTING RUNS WORK, OPEN A BRAND NEW FRESH PLATE
+    matching_plates = [
+        p for p in plates 
+        if p['alloy'] == part['alloy'] 
+        and abs(p['thickness_in'] - part['thickness_in']) < 0.01
+        and fits(p_w, p_l, p['width_in'], p['length_in'])
+    ]
+    
+    if matching_plates:
+        # Pick the standard stock sheet size available
+        selected_plate = matching_plates[0] 
+        new_run_id = len(fresh_plate_runs) + 1
+        fresh_plate_runs.append({
+            'id': new_run_id,
+            'alloy': part['alloy'],
+            'thickness': part['thickness_in'],
+            'plate_spec': selected_plate,
+            'used_area': (p_w + KERF) * (p_l + KERF),
+            'parts': [part]
+        })
+        assignments.append({'part': part, 'stock_id': f"Fresh-Plate-Run-{new_run_id}", 'type': 'new_fresh'})
     else:
-        assignments.append((part, None, 'fresh plate'))
-        print(f"  {part['width_in']}x{part['length_in']} {part['alloy']} → FRESH PLATE")
+        assignments.append({'part': part, 'stock_id': 'UNASSIGNED', 'type': 'error'})
 
-MACHINE_RATE = 75 / 60  # per minute
-SETUP_TIME = 20  # minutes
+# --- FINANCIAL COST MODEL EVALUATION ---
+total_drops_used = len(used_drops)
+total_fresh_plates_opened = len(fresh_plate_runs)
 
-fresh_needed = [a for a in assignments if a[2] == 'fresh plate']
-drops_used = [a for a in assignments if a[2] == 'drop']
+optimized_setup_cost = total_fresh_plates_opened * SETUP_TIME * MACHINE_RATE
+naive_setup_cost = len(parts) * SETUP_TIME * MACHINE_RATE
 
-# Cost with drops
-setup_cost = len(fresh_needed) * SETUP_TIME * MACHINE_RATE
-print(f"\n--- Cost Summary ---")
-print(f"Parts from drops: {len(drops_used)}")
-print(f"Parts needing fresh plates: {len(fresh_needed)}")
-print(f"Setup cost (fresh plates only): ${setup_cost:.2f}")
-
-# Cost without drops (baseline)
-baseline_setup = len(assignments) * SETUP_TIME * MACHINE_RATE
-print(f"\nBaseline (no drops, every part its own plate): ${baseline_setup:.2f}")
-print(f"Savings from using drops: ${baseline_setup - setup_cost:.2f}")
+print(f"--- Refined Optimization Output ---")
+print(f"Parts Cut from Drops: {total_drops_used}")
+print(f"Total Unique Fresh Stock Plates Loaded: {total_fresh_plates_opened}")
+print(f"Optimized Setup Cost: ${optimized_setup_cost:.2f}")
+print(f"Naive Baseline Setup Cost: ${naive_setup_cost:.2f}")
+print(f"True Setup Cost Reduction: ${naive_setup_cost - optimized_setup_cost:.2f}")
