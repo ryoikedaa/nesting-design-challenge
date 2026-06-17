@@ -11,7 +11,7 @@ with open('data/order_history.json') as f:
 MACHINE_RATE = 75.0 / 60.0  # $1.25 per minute
 SETUP_TIME = 20.0          # minutes ($25.00 flat setup cost)
 KERF = 0.1                 # 1/10th inch saw blade width
-MIN_DROP_SHORT_SIDE = 4.0  # Hard machine/convention boundary
+MIN_DROP_SHORT_SIDE = 6.0  # Hard machine/convention boundary
 
 drops = [item for item in inventory if item['kind'] == 'drop']
 plates = [item for item in inventory if item['kind'] == 'plate']
